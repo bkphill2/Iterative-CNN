@@ -334,9 +334,8 @@ dirty_images = load_images_from_directory(dirty_dir)
 X_train, y_train = dirty_images, clean_images
 
 # Create U-Net model
-with strategy.scope():
-    model = iterative_model()
-    model.compile(optimizer='adam', loss=combined_loss, metrics=['accuracy'])
+model = iterative_model()
+model.compile(optimizer='adam', loss=combined_loss, metrics=['accuracy'])
 
 # Train model
 model.fit(X_train, y_train, validation_split=0.1, epochs=5, batch_size=16)
@@ -377,99 +376,6 @@ for n in range(len(fnames)):
         etarget = epsilon_target[n]
     except:
         etarget = epsilon_target
-
-        
-    #—————————————————————————#
-    # Single-image processing #
-    #—————————————————————————#
-    for k in range(1, numits + 1):
-        #Skip it, if it's built already & we aren't overwriting old ones
-        if (not overwrite) and exists(name):
-            break
-    
-    
-        #——————————————————————————————————————————————————————————————————————#
-        # Superiorization step                                                 #
-        #——————————————————————————————————————————————————————————————————————#
-        if (use_sup) and (k >= kmin) and ((k-kmin)%kstep == 0):
-            print("Superiorizing before the next SART iteration...")
-            f_out = model.predict(np.expand_dims(f, axis=(0,-1)))[0,:,:,0]
-            f_out = tf.cast(f_out, dtype=tf.float64)
-            #Calc pnorm
-            p = f_out - f
-            pnorm = np.linalg.norm(p,'fro') + eps
-            print("pnorm: " + str(pnorm))
-            #Update alpha
-            if k == kmin:
-                #Begin with full magnitude of initial transform
-                alpha = pnorm
-            else:
-                #Attenuate for each subsequent superiorization
-                alpha *= gamma
-            print("alpha: " + str(alpha) + '\n')
-            #Apply alpha if necessary
-            if pnorm > alpha:
-                p = alpha * p / (np.linalg.norm(p,'fro') + eps) 
-                f = f + p
-            else:
-                f = f_out
-            #Image output
-            if make_intermediate:
-                makeFLT(f, outname + str(k) + '_bm3d_sup')
-                if make_png:
-                    makePNG(f, outname + str(k) + '_bm3d_sup')
-
-        #——————————————————————————————————————————————————————————————————————#
-        # SART loop                                                            #
-        #——————————————————————————————————————————————————————————————————————#
-        for j in range(ns):
-            ind1 = range(j,numtheta,ns);
-            p = P[j]
-            #Forward projection step
-            if isinstance(f, tf.Tensor):
-                f = f.numpy()
-                f = f.astype(np.float64)
-            fp_id,fp = astra.create_sino(f,p)
-            #Perform elementwise division
-            diffs = (sino[ind1,:] - fp*dx) / Minv[j] / dx                  
-            bp_id,bp = astra.create_backprojection(diffs,p)
-            #Get rid of spurious large values
-            ind2 = np.abs(bp) > 1e3
-            bp[ind2] = 0
-            #Update f
-            f = f + beta * bp / Dinv[j]
-            astra.data2d.delete(fp_id)
-            astra.data2d.delete(bp_id)
-            
-        #——————————————————————————————————————————————————————————————————————#
-        # Cleanup                                                              #
-        #——————————————————————————————————————————————————————————————————————#
-        #Image output
-        if make_intermediate:
-            makeFLT(f, outname + str(k) + '_SART')
-            if make_png:
-                makePNG(f, outname + str(k) + '_SART')
-        #Compute residual
-        fp = np.zeros((numtheta,numbin))
-        for j in range(ns):
-            ind = range(j,numtheta,ns)
-            p = P[j]
-            fp_tempid,fp_temp = astra.create_sino(f,p)
-            fp[ind,:] = fp_temp * dx
-            astra.data2d.delete(fp_tempid)
-        res = np.linalg.norm(fp-sino,'fro')
-        #Error checking
-        if calc_error: 
-             err = np.linalg.norm(f-xtrue,'fro')/np.linalg.norm(xtrue,'fro')
-             print('Iteration #{0:d}: Residual = {1:1.4f}\tError = {2:1.4f}\n'\
-                   .format(k,res,err))
-        else:
-             print('Iteration #{0:d}: Residual = {1:1.4f}\n'.format(k,res))
-        #Are we done?
-        if (res < etarget):
-            print("Target residual for " + head + " of ",end='')
-            print(str(etarget) + " reached!")
-            break
     
     #——————————————————————————————————————————————————————————————————————————#
     # Single-image Finalization                                                #
