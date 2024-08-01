@@ -1,18 +1,4 @@
 #——————————————————————————————————————————————————————————————————————————————#
-# Copyright: 2010-2018, imec Vision Lab, University of Antwerp                 #
-#            2013-2018, CWI, Amsterdam                                         # 
-#                                                                              # 
-# Contact: astra@astra-toolbox.com                                             # 
-# Website: http://www.astra-toolbox.com/                                       # 
-#——————————————————————————————————————————————————————————————————————————————#
-
-#——————————————————————————————————————————————————————————————————————————————#
-# Plug-n-Play Superiorization code by Dr. Thomas Humphries, UW Bothell         # 
-# BM3D modifications by by Dr. Thomas Humphries & Jonathan Henshaw             #   
-# Fall 2021 Undergraduate Research                                             #
-#——————————————————————————————————————————————————————————————————————————————#
-
-#——————————————————————————————————————————————————————————————————————————————#
 # Import                                                                       #
 #——————————————————————————————————————————————————————————————————————————————#
 
