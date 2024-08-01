@@ -393,8 +393,8 @@ for n in range(len(fnames)):
         #——————————————————————————————————————————————————————————————————————#
         if (use_sup) and (k >= kmin) and ((k-kmin)%kstep == 0):
             print("Superiorizing before the next SART iteration...")
-            #Apply BM3D
-            f_out = bm3d(f,sigma)
+            f_out = model.predict(np.expand_dims(f, axis=(0,-1)))[0,:,:,0]
+            f_out = tf.cast(f_out, dtype=tf.float64)
             #Calc pnorm
             p = f_out - f
             pnorm = np.linalg.norm(p,'fro') + eps
@@ -409,7 +409,7 @@ for n in range(len(fnames)):
             print("alpha: " + str(alpha) + '\n')
             #Apply alpha if necessary
             if pnorm > alpha:
-                p = alpha * p / (np.linalg.norm(p,'fro') + eps) #Denominator probably doesn't need to be recalculated here, as it's stored in 'pnorm'. Not changing it now, as I'd prefer not to break it by accident.
+                p = alpha * p / (np.linalg.norm(p,'fro') + eps) 
                 f = f + p
             else:
                 f = f_out
@@ -426,6 +426,9 @@ for n in range(len(fnames)):
             ind1 = range(j,numtheta,ns);
             p = P[j]
             #Forward projection step
+            if isinstance(f, tf.Tensor):
+                f = f.numpy()
+                f = f.astype(np.float64)
             fp_id,fp = astra.create_sino(f,p)
             #Perform elementwise division
             diffs = (sino[ind1,:] - fp*dx) / Minv[j] / dx                  
