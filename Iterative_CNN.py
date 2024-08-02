@@ -16,6 +16,7 @@ import pdb
 from Combined_Loss import combined_loss
 from tensorflow.keras.layers import Layer
 from tensorflow.keras import layers, models
+from tensorflow.keras.preprocessing.image import img_to_array, load_img
 
 #——————————————————————————————————————————————————————————————————————————————#
 # Function Definitions                                                         #
@@ -330,6 +331,15 @@ def iterative_model(input_size=(512, 512, 1)):
 #—————————————————————————#
 # CNN Directories         #
 #—————————————————————————#
+def load_images_from_directory(directory, target_size=(512, 512)): #Defines a data loading function with parameters "directory" and size of image
+    images = []                   #Creates an empty array called images
+    for filename in os.listdir(directory): #For each file in the directory argument do
+        if filename.endswith(".png"): #If it is a png file (This can be modified to flt)
+            img = load_img(os.path.join(directory, filename), target_size=target_size) #Loads the images from the directory given
+            img = img_to_array(img)       #defines the img variable as the argument of an image to array function
+            img = img / 255.0  #Normalizes pixel values
+            images.append(img)  #adds each file in the directory to the end of the array in order
+    return np.array(images) #returns the array of images
 # Directories
 clean_dir = infile
 dirty_dir = '/mmfs1/gscratch/uwb/bkphill2/60_views'
