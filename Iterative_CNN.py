@@ -1,7 +1,3 @@
-#——————————————————————————————————————————————————————————————————————————————#
-# Import                                                                       #
-#——————————————————————————————————————————————————————————————————————————————#
-
 #import
 import argparse
 from glob import glob
@@ -16,11 +12,8 @@ import pdb
 from Combined_Loss import combined_loss
 from tensorflow.keras.layers import Layer
 from tensorflow.keras import layers, models
-from tensorflow.keras.preprocessing.image import img_to_array, load_img
-
-#——————————————————————————————————————————————————————————————————————————————#
-# Function Definitions                                                         #
-#——————————————————————————————————————————————————————————————————————————————#
+from PIL import Image
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
 # This function creates projectors, preprocessing our data before
 # passing it to astra for the heavy lifting
@@ -133,8 +126,6 @@ def makePNG(f, outname):
     img = Image.fromarray(img.astype('uint8')).convert('L')
     #Save it
     img.save(outname + '.png','png')
-    return
-
 # This function outputs a .flt
 def makeFLT(f, outname):
     #Convert to float32
@@ -177,7 +168,6 @@ class IterativeLayer(layers.Layer):
         self.layer = layer
         self.threshold = threshold
         self.max_iterations = max_iterations
-
     def compute_residual(f, p, numtheta, numbin, ns, sino, dx, calc_error, xtrue, k):
         fp = np.zeros((numtheta, numbin))
         for j in range(ns):
@@ -209,13 +199,9 @@ class IterativeLayer(layers.Layer):
             print(f'iterate: {iteration}')
         return output
 
-#——————————————————————————————————————————————————————————————————————————————#
 # Main                                                                         #
-#——————————————————————————————————————————————————————————————————————————————#
 
-#——————————————————————————————#
 # Parse Arguments & Initialize #
-#——————————————————————————————#
 #Get parsed arguments
 args = generateParsedArgs()
 
@@ -291,14 +277,14 @@ angles = theta_range[0] + np.linspace(0,numtheta-1,numtheta,False) \
          *(theta_range[1]-theta_range[0])/numtheta
 
 calc_error = False
-    
+
 #Create projectors and normalization terms, corresponding to
 #diagonal matrices M and D, for each subset of projection data
 P, Dinv, D_id, Minv, M_id = [None]*ns,[None]*ns,[None]*ns,[None]*ns,[None]*ns
 for j in range(ns):
     ind1 = range(j,numtheta,ns);
     p = create_projector(geom,numbin,angles[ind1],dso,dod,fan_angle)
-    
+
     D_id[j], Dinv[j] = \
              astra.create_backprojection(np.ones((numtheta//ns,numbin)),p)
     M_id[j], Minv[j] = \
@@ -311,62 +297,11 @@ for j in range(ns):
 #Open the file for storing residuals
 res_file = open(outfolder + "/residuals.txt", "w+")
 res = 0
-#—————————————————————————#
-# CNN                     #
-#—————————————————————————#
-def iterative_model(input_size=(512, 512, 1)):
-      inputs = tf.keras.Input(input_size)
-          # Downsample
-      x = IterativeLayer(layers.Conv2D(32, (3, 3), activation='relu'))(inputs)
-      x = layers.MaxPooling2D((2, 2))(x)
-      x = IterativeLayer(layers.Conv2D(64, (3, 3), activation='relu'))(x)
-      x = layers.MaxPooling2D((2, 2))(x)
-      x = IterativeLayer(layers.Conv2D(64, (3, 3), activation='relu'))(x)
 
-      outputs = layers.Conv2D(3, (1, 1), activation='sigmoid')(c9)
-      model = models.Model(inputs=inputs, outputs=[outputs])
-
-      return model
-  
-#—————————————————————————#
-# CNN Directories         #
-#—————————————————————————#
-def load_images_from_directory(directory, target_size=(512, 512)): #Defines a data loading function with parameters "directory" and size of image
-    images = []                   #Creates an empty array called images
-    for filename in os.listdir(directory): #For each file in the directory argument do
-        if filename.endswith(".png"): #If it is a png file (This can be modified to flt)
-            img = load_img(os.path.join(directory, filename), target_size=target_size) #Loads the images from the directory given
-            img = img_to_array(img)       #defines the img variable as the argument of an image to array function
-            img = img / 255.0  #Normalizes pixel values
-            images.append(img)  #adds each file in the directory to the end of the array in order
-    return np.array(images) #returns the array of images
-# Directories
-clean_dir = infile
-dirty_dir = '/mmfs1/gscratch/uwb/bkphill2/60_views'
-
-clean_images = load_images_from_directory(clean_dir)
-dirty_images = load_images_from_directory(dirty_dir)
-
-# Split dataset
-X_train, y_train = dirty_images, clean_images
-
-# Create U-Net model
-model = iterative_model()
-model.compile(optimizer='adam', loss=combined_loss, metrics=['accuracy'])
-
-# Train model
-model.fit(X_train, y_train, validation_split=0.1, epochs=5, batch_size=16)
-
-# Save model
-model.save('iterative_model.h5')
-
-#————————————#
-# Processing #
-#————————————#
 #For each filename provided
 for n in range(len(fnames)):
-    #Per-image initialization:
-    #Get filename for output
+#Per-image initialization:
+#Get filename for output
     name = fnames[n]
     head, tail = os.path.split(name)
     #Extract numerical part of filename only. Assumes we have ######_sino.flt
@@ -377,7 +312,7 @@ for n in range(len(fnames)):
     #Read in sinogram
     sino = np.fromfile(name,dtype='f')
     sino = sino.reshape(numtheta,numbin)
-    
+
     #Create a new square nparray for the image size we have
     f = np.zeros((numpix,numpix))
 
@@ -393,24 +328,66 @@ for n in range(len(fnames)):
         etarget = epsilon_target[n]
     except:
         etarget = epsilon_target
-    
-    #——————————————————————————————————————————————————————————————————————————#
-    # Single-image Finalization                                                #
-    #——————————————————————————————————————————————————————————————————————————#
+
+    # Single-image Finalization
     #Write the final residual to the file for this image
     res_file.write("%f\n" % res)
     if use_sup:
         makeFLT(f, outname + str(k) + '_BM3Dsup')
-        if make_png:
-            makePNG(f, outname + str(k) + '_BM3Dsup')
+    if make_png:
+        makePNG(f, outname + str(k) + '_BM3Dsup')
     else:
         makeFLT(f, outname + str(k) + '_SART')
-        if make_png:
-            makePNG(f, outname + str(k) + '_SART')
+    if make_png:
+        makePNG(f, outname + str(k) + '_SART')
 
-#—————————————————————#
-# Full Batch Complete #
-#—————————————————————#
+# CNN                     #
+def iterative_model(input_size=(512, 512, 1)):
+      inputs = tf.keras.Input(input_size)
+          # Downsample
+      x = IterativeLayer(layers.Conv2D(32, (3, 3), activation='relu'))(inputs)
+      x = layers.MaxPooling2D((2, 2))(x)
+      x = IterativeLayer(layers.Conv2D(64, (3, 3), activation='relu'))(x)
+      x = layers.MaxPooling2D((2, 2))(x)
+      x = IterativeLayer(layers.Conv2D(64, (3, 3), activation='relu'))(x)
+
+      outputs = layers.Conv2D(3, (1, 1), activation='sigmoid')(c9)
+      model = models.Model(inputs=inputs, outputs=[outputs])
+
+      return model
+
+def load_images_from_directory(directory, target_size=(512, 512)): #Defines a data loading function with parameters "directory" and size of image
+    images = []                   #Creates an empty array called images
+    for filename in os.listdir(directory): #For each file in the directory argument do
+        if filename.endswith(".png"): #If it is a png file (This can be modified to flt)
+            img = load_img(os.path.join(directory, filename), target_size=target_size) #Loads the images from the directory given
+            img = img_to_array(img)       #defines the img variable as the argument of an image to array function
+            img = img / 255.0  #Normalizes pixel values
+            images.append(img)  #adds each file in the directory to the end of the array in order
+    return np.array(images) #returns the array of images
+
+
+
+# CNN Directories         #
+# Directories
+clean_dir = infile
+dirty_dir = '/mmfs1/gscratch/uwb/bkphill2/60_views'
+
+clean_images = load_images_from_directory(clean_dir)
+dirty_images = load_images_from_directory(dirty_dir)
+
+# Split dataset
+X_train, y_train = dirty_images, clean_images
+# Create U-Net model
+model = iterative_model()
+model.compile(optimizer='adam', loss=combined_loss, metrics=['accuracy'])
+
+# Train model
+model.fit(X_train, y_train, validation_split=0.1, epochs=5, batch_size=16)
+
+# Save model
+model.save('iterative_model.h5')
+
 print("\n\nExiting...")
 
 #Cleanup
@@ -419,10 +396,4 @@ for j in range(ns):
     astra.data2d.delete(M_id[j])
     astra.projector.delete(P[j])
 res_file.close()
-
-#——————————————————————————————————————————————————————————————————————————————#
-# The End!                                                                     #
-#——————————————————————————————————————————————————————————————————————————————#
-
-
 
